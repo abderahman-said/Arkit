@@ -13,7 +13,9 @@ import {
   Eraser,
   X,
   Check,
-  Loader2
+  Loader2,
+  Move,
+  Wand2
 } from "lucide-react";
 import { ProgressBar } from "@/components/progress-bar";
 import { LivePreview } from "@/components/live-preview";
@@ -45,6 +47,11 @@ export default function ImageEditorPage() {
   const [cropArea, setCropArea] = useState<CropArea | null>(null);
   const [isCropping, setIsCropping] = useState(false);
   const [cropStart, setCropStart] = useState<{ x: number; y: number } | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [moveStart, setMoveStart] = useState<{ x: number; y: number } | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ cropArea: CropArea; mouseX: number; mouseY: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cropOverlayRef = useRef<HTMLDivElement>(null);
@@ -154,9 +161,107 @@ export default function ImageEditorPage() {
     };
   }, []);
 
+  // Auto-detect subject for smart cropping
+  const autoDetectSubject = useCallback(async () => {
+    if (!previewUrl || !imageRef.current) return;
+    
+    setIsProcessing(true);
+    setProgress(10);
+    
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = previewUrl;
+      });
+
+      setProgress(30);
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        setIsProcessing(false);
+        return;
+      }
+
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+
+      setProgress(50);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Find edges and subject boundaries
+      let minX = canvas.width, maxX = 0, minY = canvas.height, maxY = 0;
+      let hasContent = false;
+
+      for (let y = 0; y < canvas.height; y += 2) {
+        for (let x = 0; x < canvas.width; x += 2) {
+          const i = (y * canvas.width + x) * 4;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+          
+          // Skip transparent or very light pixels
+          if (a < 200) continue;
+          
+          const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+          const variance = Math.abs(r - g) + Math.abs(g - b) + Math.abs(b - r);
+          
+          // Detect non-background pixels
+          if (brightness < 240 || variance > 30) {
+            hasContent = true;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+          }
+        }
+      }
+
+      setProgress(80);
+
+      if (hasContent && minX < maxX && minY < maxY) {
+        const displayRect = getImageDisplayRect();
+        if (displayRect) {
+          const scaleX = displayRect.width / canvas.width;
+          const scaleY = displayRect.height / canvas.height;
+          
+          // Add padding
+          const padding = 20;
+          const cropX = Math.max(0, minX * scaleX - padding);
+          const cropY = Math.max(0, minY * scaleY - padding);
+          const cropW = Math.min(displayRect.width - cropX, (maxX - minX) * scaleX + padding * 2);
+          const cropH = Math.min(displayRect.height - cropY, (maxY - minY) * scaleY + padding * 2);
+          
+          setCropArea({ x: cropX, y: cropY, width: cropW, height: cropH });
+        }
+      }
+
+      setProgress(100);
+      setIsProcessing(false);
+    } catch (error) {
+      console.error("Auto-detect error:", error);
+      setIsProcessing(false);
+    }
+  }, [previewUrl, getImageDisplayRect]);
+
   // Smooth crop handling with requestAnimationFrame
   const handleCropStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!previewUrl || mode !== "crop" || !imageRef.current) return;
+    
+    // Don't start new crop if clicking on handles or existing crop area
+    const target = e.target as HTMLElement;
+    if (target.closest('.crop-handle') || target.closest('.crop-move-area')) {
+      return;
+    }
+    
     e.preventDefault();
     e.stopPropagation();
     
@@ -221,41 +326,131 @@ export default function ImageEditorPage() {
 
   const handleCropEnd = useCallback(() => {
     setIsCropping(false);
+    setIsResizing(false);
+    setIsMoving(false);
+    setResizeHandle(null);
+    setMoveStart(null);
+    setResizeStart(null);
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
   }, []);
 
-  // Global mouse handlers for smooth dragging
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent, handle: string) => {
+    if (!cropArea) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setResizeHandle(handle);
+    setIsResizing(true);
+    const containerRect = containerRef.current!.getBoundingClientRect();
+    const displayRect = getImageDisplayRect();
+    if (displayRect) {
+      const mouseX = e.clientX - containerRect.left - displayRect.left;
+      const mouseY = e.clientY - containerRect.top - displayRect.top;
+      setResizeStart({ cropArea: { ...cropArea }, mouseX, mouseY });
+    }
+  }, [cropArea, getImageDisplayRect]);
+
+  // Handle move start
+  const handleMoveStart = useCallback((e: React.MouseEvent) => {
+    if (!cropArea) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMoving(true);
+    const containerRect = containerRef.current!.getBoundingClientRect();
+    setMoveStart({ x: e.clientX - containerRect.left, y: e.clientY - containerRect.top });
+  }, [cropArea]);
+
+  // Global mouse handlers for smooth dragging, resizing, and moving
   useEffect(() => {
-    if (!isCropping) return;
+    if (!isCropping && !isResizing && !isMoving) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!cropStart || !imageRef.current || !containerRef.current) return;
+      if (!imageRef.current || !containerRef.current) return;
+      
+      const displayRect = getImageDisplayRect();
+      if (!displayRect) return;
+      
+      const containerRect = containerRef.current.getBoundingClientRect();
       
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
       
       rafRef.current = requestAnimationFrame(() => {
-        const displayRect = getImageDisplayRect();
-        if (!displayRect) return;
-        
-        const containerRect = containerRef.current!.getBoundingClientRect();
-        const currentX = e.clientX - containerRect.left - displayRect.left;
-        const currentY = e.clientY - containerRect.top - displayRect.top;
-        
-        // Clamp to image bounds
-        const clampedX = Math.max(0, Math.min(displayRect.width, currentX));
-        const clampedY = Math.max(0, Math.min(displayRect.height, currentY));
-        
-        const x = Math.min(cropStart.x, clampedX);
-        const y = Math.min(cropStart.y, clampedY);
-        const width = Math.abs(clampedX - cropStart.x);
-        const height = Math.abs(clampedY - cropStart.y);
-        
-        setCropArea({ x, y, width, height });
+        if (isCropping && cropStart) {
+          // Creating new crop area
+          const currentX = e.clientX - containerRect.left - displayRect.left;
+          const currentY = e.clientY - containerRect.top - displayRect.top;
+          
+          const clampedX = Math.max(0, Math.min(displayRect.width, currentX));
+          const clampedY = Math.max(0, Math.min(displayRect.height, currentY));
+          
+          const x = Math.min(cropStart.x, clampedX);
+          const y = Math.min(cropStart.y, clampedY);
+          const width = Math.abs(clampedX - cropStart.x);
+          const height = Math.abs(clampedY - cropStart.y);
+          
+          setCropArea({ x, y, width, height });
+        } else if (isResizing && resizeHandle && resizeStart) {
+          // Resizing existing crop area
+          const currentX = e.clientX - containerRect.left - displayRect.left;
+          const currentY = e.clientY - containerRect.top - displayRect.top;
+          
+          const startArea = resizeStart.cropArea;
+          const deltaX = currentX - resizeStart.mouseX;
+          const deltaY = currentY - resizeStart.mouseY;
+          
+          let newX = startArea.x;
+          let newY = startArea.y;
+          let newWidth = startArea.width;
+          let newHeight = startArea.height;
+          
+          if (resizeHandle.includes('top')) {
+            newY = Math.max(0, Math.min(startArea.y + startArea.height - 20, startArea.y + deltaY));
+            newHeight = startArea.height + (startArea.y - newY);
+          }
+          if (resizeHandle.includes('bottom')) {
+            newHeight = Math.max(20, Math.min(displayRect.height - startArea.y, startArea.height + deltaY));
+          }
+          if (resizeHandle.includes('left')) {
+            newX = Math.max(0, Math.min(startArea.x + startArea.width - 20, startArea.x + deltaX));
+            newWidth = startArea.width + (startArea.x - newX);
+          }
+          if (resizeHandle.includes('right')) {
+            newWidth = Math.max(20, Math.min(displayRect.width - startArea.x, startArea.width + deltaX));
+          }
+          
+          // Clamp to image bounds
+          if (newX < 0) {
+            newWidth += newX;
+            newX = 0;
+          }
+          if (newY < 0) {
+            newHeight += newY;
+            newY = 0;
+          }
+          if (newX + newWidth > displayRect.width) {
+            newWidth = displayRect.width - newX;
+          }
+          if (newY + newHeight > displayRect.height) {
+            newHeight = displayRect.height - newY;
+          }
+          
+          setCropArea({ x: newX, y: newY, width: newWidth, height: newHeight });
+        } else if (isMoving && cropArea && moveStart) {
+          // Moving crop area
+          const deltaX = (e.clientX - containerRect.left) - moveStart.x;
+          const deltaY = (e.clientY - containerRect.top) - moveStart.y;
+          
+          const newX = Math.max(0, Math.min(displayRect.width - cropArea.width, cropArea.x + deltaX));
+          const newY = Math.max(0, Math.min(displayRect.height - cropArea.height, cropArea.y + deltaY));
+          
+          setCropArea({ ...cropArea, x: newX, y: newY });
+          setMoveStart({ x: e.clientX - containerRect.left, y: e.clientY - containerRect.top });
+        }
       });
     };
 
@@ -273,7 +468,7 @@ export default function ImageEditorPage() {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [isCropping, cropStart, getImageDisplayRect, handleCropEnd]);
+  }, [isCropping, isResizing, isMoving, cropStart, resizeHandle, resizeStart, moveStart, cropArea, getImageDisplayRect, handleCropEnd]);
 
   const applyCrop = async () => {
     if (!previewUrl || !cropArea || !selectedFile || cropArea.width <= 0 || cropArea.height <= 0) return;
@@ -388,44 +583,115 @@ export default function ImageEditorPage() {
 
       setProgress(60);
 
-      // Improved background removal algorithm
-      // Uses multiple techniques: brightness, color similarity, and edge detection
+      // Advanced background removal algorithm
+      // Uses multiple techniques: brightness, color similarity, edge detection, and flood fill
+      
+      // First pass: Identify background color from corners
+      const cornerSamples: number[][] = [];
+      const sampleSize = Math.min(50, Math.floor(canvas.width / 10), Math.floor(canvas.height / 10));
+      
+      // Sample corners
+      for (let y = 0; y < sampleSize; y++) {
+        for (let x = 0; x < sampleSize; x++) {
+          // Top-left
+          const idx1 = (y * canvas.width + x) * 4;
+          cornerSamples.push([data[idx1], data[idx1 + 1], data[idx1 + 2]]);
+          
+          // Top-right
+          const idx2 = (y * canvas.width + (canvas.width - 1 - x)) * 4;
+          cornerSamples.push([data[idx2], data[idx2 + 1], data[idx2 + 2]]);
+          
+          // Bottom-left
+          const idx3 = ((canvas.height - 1 - y) * canvas.width + x) * 4;
+          cornerSamples.push([data[idx3], data[idx3 + 1], data[idx3 + 2]]);
+          
+          // Bottom-right
+          const idx4 = ((canvas.height - 1 - y) * canvas.width + (canvas.width - 1 - x)) * 4;
+          cornerSamples.push([data[idx4], data[idx4 + 1], data[idx4 + 2]]);
+        }
+      }
+      
+      // Calculate average background color
+      const avgBg = cornerSamples.reduce(
+        (acc, [r, g, b]) => [acc[0] + r, acc[1] + g, acc[2] + b],
+        [0, 0, 0]
+      ).map(v => v / cornerSamples.length);
+      
+      // Calculate threshold for background similarity
+      const threshold = 40;
+      
+      // Second pass: Remove background pixels
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         const a = data[i + 3];
         
-        // Skip already transparent pixels
         if (a === 0) continue;
+        
+        // Calculate distance from average background color
+        const colorDist = Math.sqrt(
+          Math.pow(r - avgBg[0], 2) +
+          Math.pow(g - avgBg[1], 2) +
+          Math.pow(b - avgBg[2], 2)
+        );
         
         // Calculate brightness
         const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
         
-        // Calculate color variance (how similar RGB values are)
+        // Calculate color variance
         const variance = Math.abs(r - g) + Math.abs(g - b) + Math.abs(b - r);
         
-        // Method 1: Remove very bright/white backgrounds
+        // Method 1: Remove pixels similar to corner background
+        if (colorDist < threshold) {
+          data[i + 3] = 0;
+          continue;
+        }
+        
+        // Method 2: Remove very bright/white backgrounds
         if (brightness > 245 && variance < 20) {
           data[i + 3] = 0;
           continue;
         }
         
-        // Method 2: Remove light gray backgrounds
-        if (brightness > 230 && brightness < 250 && variance < 30) {
-          data[i + 3] = Math.max(0, a - 150);
+        // Method 3: Remove light backgrounds with smooth transition
+        if (brightness > 230 && variance < 30) {
+          const alpha = Math.max(0, a - Math.min(200, (brightness - 230) * 10));
+          data[i + 3] = alpha;
           continue;
         }
         
-        // Method 3: Remove very light colored backgrounds (pastels)
-        if (brightness > 240 && r > 200 && g > 200 && b > 200) {
-          data[i + 3] = Math.max(0, a - 120);
-          continue;
-        }
-        
-        // Method 4: Remove near-white backgrounds with slight tint
+        // Method 4: Remove near-white backgrounds
         if (brightness > 235 && Math.min(r, g, b) > 220) {
           data[i + 3] = Math.max(0, a - 100);
+        }
+      }
+      
+      // Third pass: Edge detection to preserve subject edges
+      const edgeData = new Uint8ClampedArray(data);
+      for (let y = 1; y < canvas.height - 1; y++) {
+        for (let x = 1; x < canvas.width - 1; x++) {
+          const idx = (y * canvas.width + x) * 4;
+          
+          if (data[idx + 3] === 0) continue;
+          
+          // Check surrounding pixels for edges
+          let edgeStrength = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nIdx = ((y + dy) * canvas.width + (x + dx)) * 4;
+              const neighborAlpha = edgeData[nIdx + 3];
+              if (neighborAlpha === 0) {
+                edgeStrength += 50;
+              }
+            }
+          }
+          
+          // Preserve edge pixels
+          if (edgeStrength > 100) {
+            data[idx + 3] = Math.min(255, data[idx + 3] + 30);
+          }
         }
       }
 
@@ -522,7 +788,19 @@ export default function ImageEditorPage() {
               </TabsList>
 
               <TabsContent value="crop" className="space-y-4 mt-4">
-                <p className="text-sm text-muted-foreground">{t("imageEditor.cropDescription")}</p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <p className="text-sm text-muted-foreground flex-1">{t("imageEditor.cropDescription")}</p>
+                  <Button
+                    onClick={autoDetectSubject}
+                    disabled={!previewUrl || isProcessing}
+                    variant="outline"
+                    size="sm"
+                    className="sm:w-auto"
+                  >
+                    <Wand2 className="h-4 w-4 mr-2 rtl:ml-2 rtl:mr-0" />
+                    {t("imageEditor.autoDetect")}
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="removebg" className="space-y-4 mt-4">
@@ -615,7 +893,7 @@ export default function ImageEditorPage() {
                         {/* Crop border with grid */}
                         <div
                           ref={cropOverlayRef}
-                          className="absolute border-2 border-white shadow-2xl pointer-events-none"
+                          className="absolute border-2 border-white shadow-2xl"
                           style={{
                             left: `${cropArea.x}px`,
                             top: `${cropArea.y}px`,
@@ -624,8 +902,19 @@ export default function ImageEditorPage() {
                             boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.6)",
                           }}
                         >
+                          {/* Move area - center of crop */}
+                          <div
+                            className="crop-move-area absolute inset-4 cursor-move hover:bg-white/10 transition-colors rounded"
+                            onMouseDown={handleMoveStart}
+                            style={{ cursor: isMoving ? 'grabbing' : 'grab' }}
+                          >
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                              <Move className="h-6 w-6 text-white/50" />
+                            </div>
+                          </div>
+                          
                           {/* Grid lines (Rule of Thirds) */}
-                          <div className="absolute inset-0 border border-white/30" style={{
+                          <div className="absolute inset-0 border border-white/30 pointer-events-none" style={{
                             backgroundImage: `
                               linear-gradient(to right, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.15) 1px, transparent 1px),
                               linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.15) 1px, transparent 1px)
@@ -633,58 +922,46 @@ export default function ImageEditorPage() {
                             backgroundSize: `${cropArea.width / 3}px ${cropArea.height / 3}px`,
                           }} />
                           
-                          {/* Corner handles */}
+                          {/* Corner handles - interactive */}
                           {[
-                            { x: 0, y: 0, cursor: "nwse-resize" },
-                            { x: cropArea.width, y: 0, cursor: "nesw-resize" },
-                            { x: 0, y: cropArea.height, cursor: "nesw-resize" },
-                            { x: cropArea.width, y: cropArea.height, cursor: "nwse-resize" },
+                            { x: 0, y: 0, handle: "top-left", cursor: "nwse-resize" },
+                            { x: cropArea.width, y: 0, handle: "top-right", cursor: "nesw-resize" },
+                            { x: 0, y: cropArea.height, handle: "bottom-left", cursor: "nesw-resize" },
+                            { x: cropArea.width, y: cropArea.height, handle: "bottom-right", cursor: "nwse-resize" },
                           ].map((pos, i) => (
                             <div
                               key={i}
-                              className="crop-handle absolute w-5 h-5 bg-white border-2 border-purple-500 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg"
+                              className="crop-handle absolute w-6 h-6 bg-white border-2 border-purple-500 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg cursor-pointer hover:scale-125 transition-transform z-10"
                               style={{
                                 left: `${pos.x}px`,
                                 top: `${pos.y}px`,
                                 cursor: pos.cursor,
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = "scale(1.3)";
-                                e.currentTarget.style.transition = "transform 0.2s ease-out";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = "scale(1)";
-                              }}
+                              onMouseDown={(e) => handleResizeStart(e, pos.handle)}
                             />
                           ))}
                           
-                          {/* Edge handles */}
+                          {/* Edge handles - interactive */}
                           {[
-                            { x: cropArea.width / 2, y: 0, cursor: "ns-resize" },
-                            { x: cropArea.width / 2, y: cropArea.height, cursor: "ns-resize" },
-                            { x: 0, y: cropArea.height / 2, cursor: "ew-resize" },
-                            { x: cropArea.width, y: cropArea.height / 2, cursor: "ew-resize" },
+                            { x: cropArea.width / 2, y: 0, handle: "top", cursor: "ns-resize" },
+                            { x: cropArea.width / 2, y: cropArea.height, handle: "bottom", cursor: "ns-resize" },
+                            { x: 0, y: cropArea.height / 2, handle: "left", cursor: "ew-resize" },
+                            { x: cropArea.width, y: cropArea.height / 2, handle: "right", cursor: "ew-resize" },
                           ].map((pos, i) => (
                             <div
                               key={`edge-${i}`}
-                              className="crop-handle absolute w-4 h-4 bg-purple-500 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg"
+                              className="crop-handle absolute w-5 h-5 bg-purple-500 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg cursor-pointer hover:scale-125 transition-transform z-10"
                               style={{
                                 left: `${pos.x}px`,
                                 top: `${pos.y}px`,
                                 cursor: pos.cursor,
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = "scale(1.4)";
-                                e.currentTarget.style.transition = "transform 0.2s ease-out";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = "scale(1)";
-                              }}
+                              onMouseDown={(e) => handleResizeStart(e, pos.handle)}
                             />
                           ))}
                           
                           {/* Size indicator */}
-                          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10 pointer-events-none">
                             {Math.round(cropArea.width)} × {Math.round(cropArea.height)}
                           </div>
                         </div>

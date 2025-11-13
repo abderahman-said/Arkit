@@ -160,7 +160,8 @@
     "processing": "جاري المعالجة...",
     "original": "الأصلي",
     "cropped": "مقص",
-    "noBackground": "بدون خلفية"
+    "noBackground": "بدون خلفية",
+    "autoDetect": "تحديد تلقائي للموضوع"
   },
     "tools": {
         "imageConverter": {

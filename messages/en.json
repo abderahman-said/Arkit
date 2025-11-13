@@ -161,7 +161,8 @@
     "processing": "Processing...",
     "original": "Original",
     "cropped": "Cropped",
-    "noBackground": "No Background"
+    "noBackground": "No Background",
+    "autoDetect": "Auto Detect Subject"
   },
   "tools": {
     "imageConverter": {
