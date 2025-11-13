@@ -1,0 +1,296 @@
+@import "tailwindcss";
+@layer base {
+     :root {
+        --font-geist-sans: var(--font-geist-sans);
+        --font-geist-mono: var(--font-geist-mono);
+        --font-cairo: var(--font-cairo);
+    }
+    /* تطبيق خط Cairo كخط افتراضي */
+    body {
+        font-family: var(--font-cairo), var(--font-geist-sans), sans-serif;
+    }
+    .font-geist-sans {
+        font-family: var(--font-geist-sans), sans-serif;
+    }
+    .font-geist-mono {
+        font-family: var(--font-geist-mono), monospace;
+    }
+    .font-cairo {
+        font-family: var(--font-cairo), sans-serif;
+    }
+    /* RTL Support */
+    [dir="rtl"] {
+        direction: rtl;
+        text-align: right;
+        font-family: var(--font-cairo), sans-serif;
+    }
+    [dir="ltr"] {
+        direction: ltr;
+        text-align: left;
+    }
+    /* RTL Margin Fixes */
+    [dir="rtl"] .ml-auto {
+        margin-left: 0 !important;
+        margin-right: auto !important;
+    }
+    [dir="rtl"] .mr-2 {
+        margin-right: 0 !important;
+        margin-left: 0.5rem !important;
+    }
+    [dir="rtl"] .mr-4 {
+        margin-right: 0 !important;
+        margin-left: 1rem !important;
+    }
+    [dir="rtl"] .space-x-2>*+* {
+        margin-left: 0.5rem;
+        margin-right: 0;
+    }
+    [dir="rtl"] .gap-2 {
+        gap: 0.5rem;
+    }
+}
+
+::selection {
+    background-color: #000;
+    color: #fff;
+}
+
+@layer base {
+     :root {
+        --background: 0 0% 100%;
+        --foreground: 0 0% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 3.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 3.9%;
+        --primary: 221.2 83.2% 53.3%;
+        --primary-foreground: 210 40% 98%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 222.2 47.4% 11.2%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 221.2 83.2% 53.3%;
+        --radius: 0.5rem;
+        /* Gradient Colors */
+        --gradient-from: 221.2 83.2% 53.3%;
+        --gradient-to: 217.2 91.2% 59.8%;
+        --gradient-accent-from: 280 100% 70%;
+        --gradient-accent-to: 320 100% 60%;
+    }
+    .dark {
+        --background: 0 0% 0%;
+        --foreground: 0 0% 98%;
+        --card: 0 0% 3%;
+        --card-foreground: 0 0% 98%;
+        --popover: 0 0% 0%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 217.2 91.2% 59.8%;
+        --primary-foreground: 222.2 47.4% 11.2%;
+        --secondary: 217.2 32.6% 8%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217.2 32.6% 5%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --accent: 217.2 32.6% 8%;
+        --accent-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 217.2 32.6% 12%;
+        --input: 217.2 32.6% 8%;
+        --ring: 224.3 76.3% 94.1%;
+        /* Gradient Colors Dark */
+        --gradient-from: 217.2 91.2% 59.8%;
+        --gradient-to: 221.2 83.2% 53.3%;
+        --gradient-accent-from: 280 100% 70%;
+        --gradient-accent-to: 320 100% 60%;
+    }
+}
+
+@layer base {
+    * {
+        border-color: hsl(var(--border));
+    }
+    body {
+        background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted) / 0.2) 50%, hsl(var(--background)) 100%);
+        background-attachment: fixed;
+        color: hsl(var(--foreground));
+        transition: background-color 0.3s ease;
+    }
+    .dark body {
+        background: hsl(var(--background));
+    }
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+    /* Selection colors */
+     ::selection {
+        background-color: hsl(var(--primary) / 0.2);
+        color: hsl(var(--primary-foreground));
+    }
+    /* Scrollbar styling */
+     ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+     ::-webkit-scrollbar-track {
+        background: hsl(var(--muted) / 0.3);
+        border-radius: 10px;
+    }
+     ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.6), hsl(var(--primary) / 0.4));
+        border-radius: 10px;
+        transition: background 0.3s ease;
+    }
+     ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, hsl(var(--primary) / 0.8), hsl(var(--primary) / 0.6));
+    }
+}
+
+@layer utilities {
+    .animate-in {
+        animation: fadeIn 0.5s ease-out forwards;
+    }
+    .fade-in-0 {
+        opacity: 0;
+        animation: fadeIn 0.5s ease-out forwards;
+    }
+    .slide-in-from-bottom-4 {
+        opacity: 0;
+        animation: slideInFromBottom 0.6s ease-out forwards;
+    }
+    .slide-in-from-top-4 {
+        opacity: 0;
+        animation: slideInFromTop 0.6s ease-out forwards;
+    }
+    /* Gradient backgrounds */
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
+    }
+    .bg-gradient-accent {
+        background: linear-gradient(135deg, hsl(var(--gradient-accent-from)), hsl(var(--gradient-accent-to)));
+    }
+    /* Hover effects */
+    .hover-lift {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .hover-lift:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px -5px hsl(var(--primary) / 0.3);
+    }
+    .hover-glow {
+        transition: box-shadow 0.3s ease;
+    }
+    .hover-glow:hover {
+        box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+    }
+    .hover-scale {
+        transition: transform 0.3s ease;
+    }
+    .hover-scale:hover {
+        transform: scale(1.05);
+    }
+    /* Glass morphism effect */
+    .glass {
+        background: hsl(var(--card) / 0.7);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        border: 1px solid hsl(var(--border) / 0.5);
+    }
+    /* Shine effect */
+    .shine {
+        position: relative;
+        overflow: hidden;
+    }
+    .shine::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, hsl(var(--primary-foreground) / 0.2), transparent);
+        transition: left 0.5s ease;
+    }
+    .shine:hover::before {
+        left: 100%;
+    }
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    @keyframes slideInFromBottom {
+        from {
+            opacity: 0;
+            transform: translateY(1rem);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes slideInFromTop {
+        from {
+            opacity: 0;
+            transform: translateY(-1rem);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes shimmer {
+        0% {
+            transform: translateX(-100%);
+        }
+        100% {
+            transform: translateX(100%);
+        }
+    }
+    @keyframes float {
+        0%,
+        100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+    @keyframes pulse-glow {
+        0%,
+        100% {
+            box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+        }
+        50% {
+            box-shadow: 0 0 30px hsl(var(--primary) / 0.6);
+        }
+    }
+    .animate-shimmer {
+        animation: shimmer 2s infinite;
+    }
+    .animate-float {
+        animation: float 3s ease-in-out infinite;
+    }
+    .delay-1000 {
+        animation-delay: 1s;
+    }
+    .animate-pulse-glow {
+        animation: pulse-glow 2s ease-in-out infinite;
+    }
+    /* Gradient text */
+    .text-gradient {
+        background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+}
