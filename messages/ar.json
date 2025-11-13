@@ -119,6 +119,30 @@
     "useTool": "استخدم",
     "placeholder": "اكتب رسالتك..."
   },
+  "livePreview": {
+    "title": "معاينة مباشرة",
+    "description": "شاهد النتيجة قبل التحميل",
+    "before": "قبل",
+    "after": "بعد",
+    "saved": "تم التوفير",
+    "original": "الأصلي",
+    "processed": "المعالج",
+    "download": "تحميل",
+    "extractedText": "النص المستخرج",
+    "textPreview": "معاينة النص المستخرج من الصورة"
+  },
+  "dragDrop": {
+    "dropFiles": "أسقط الملفات هنا",
+    "releaseToProcess": "أفلت الملفات لبدء المعالجة",
+    "selectTool": "اختر الأداة",
+    "filesSelected": "{count} ملف محدد",
+    "moreFiles": "ملفات أخرى",
+    "useSuggestedTool": "استخدم الأداة المقترحة"
+  },
+  "quickActions": {
+    "recentTools": "الأدوات الأخيرة",
+    "used": "مستخدم"
+  },
     "tools": {
         "imageConverter": {
             "title": "محول الصور",

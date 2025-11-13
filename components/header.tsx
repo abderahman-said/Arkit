@@ -196,7 +196,7 @@ export function Header({ mobileMenuOpen = false, setMobileMenuOpen = () => {} }:
           </Button>
 
           {/* User Menu */}
-          {session ? (
+          {/* {session ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -242,7 +242,7 @@ export function Header({ mobileMenuOpen = false, setMobileMenuOpen = () => {} }:
               <span className="relative z-10 font-medium">{t("common.signIn")}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/10 to-primary/20 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
             </Button>
-          )}
+          )} */}
         </div>
       </div>
     </header>

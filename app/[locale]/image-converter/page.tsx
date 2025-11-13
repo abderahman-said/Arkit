@@ -6,7 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Download, Upload, Image as ImageIcon, Sparkles, CheckCircle2, Palette, Zap, X } from "lucide-react";
 import { ProgressBar } from "@/components/progress-bar";
+import { LivePreview } from "@/components/live-preview";
 import { incrementImagesUploaded, incrementConversions } from "@/lib/stats";
+import { getToolSettings, saveToolSettings } from "@/lib/settings";
+import { useEffect } from "react";
 
 type ImageFormat = "jpg" | "png" | "webp" | "avif";
 
@@ -19,6 +22,33 @@ export default function ImageConverterPage() {
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [convertedBlob, setConvertedBlob] = useState<Blob | null>(null);
+
+  // Load saved settings
+  useEffect(() => {
+    const settings = getToolSettings("image-converter");
+    if (settings.outputFormat) {
+      setOutputFormat(settings.outputFormat as ImageFormat);
+    }
+  }, []);
+
+  // Save settings when changed
+  useEffect(() => {
+    saveToolSettings("image-converter", { outputFormat });
+  }, [outputFormat]);
+
+  // Track tool usage for Quick Actions
+  useEffect(() => {
+    if (selectedFile) {
+      const event = new CustomEvent('tool-used', {
+        detail: {
+          toolId: 'image-converter',
+          toolHref: '/image-converter'
+        }
+      });
+      window.dispatchEvent(event);
+    }
+  }, [selectedFile]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,6 +117,7 @@ export default function ImageConverterPage() {
               setProgress(100);
               const url = URL.createObjectURL(blob);
               setConvertedUrl(url);
+              setConvertedBlob(blob);
               incrementConversions();
             }
             setIsProcessing(false);
@@ -290,37 +321,15 @@ export default function ImageConverterPage() {
               </Button>
             )}
 
-            {/* Results */}
-            {convertedUrl && (
-              <div className="space-y-6 slide-in-from-bottom-4">
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-2 border-green-500/30 shadow-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 shadow-lg">
-                      <CheckCircle2 className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-green-700 dark:text-green-400">{t("tools.imageConverter.conversionSuccess")} 🎉</h3>
-                      <p className="text-sm text-muted-foreground">{t("tools.imageConverter.readyToDownload")} {outputFormat.toUpperCase()}</p>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 p-4 rounded-xl bg-white/50 dark:bg-black/20 border border-green-200/50 dark:border-green-800/50">
-                    <img
-                      src={convertedUrl}
-                      alt="Converted"
-                      className="w-full h-auto max-h-96 object-contain rounded-lg"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={downloadImage}
-                    className="w-full h-12 text-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl hover:shadow-green-500/30 transition-all duration-300 hover:scale-105 active:scale-95"
-                  >
-                    <Download className="h-5 w-5 ml-2 rtl:mr-2 rtl:ml-0" />
-                    {t("tools.imageConverter.download")}
-                  </Button>
-                </div>
-              </div>
+            {/* Live Preview */}
+            {convertedUrl && convertedBlob && selectedFile && (
+              <LivePreview
+                originalFile={selectedFile}
+                processedData={convertedBlob}
+                type="image"
+                onDownload={downloadImage}
+                className="mt-6"
+              />
             )}
           </CardContent>
         </Card>

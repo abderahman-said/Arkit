@@ -13,8 +13,7 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
-  Zap,
-  Link2
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -27,20 +26,6 @@ const tools = [
     href: "/", 
     label: "common.dashboard",
     color: "from-blue-500 to-cyan-500"
-  },
-  { 
-    id: "autoDetect", 
-    icon: Zap, 
-    href: "/auto-detect", 
-    label: "autoDetect.title",
-    color: "from-purple-500 to-pink-500"
-  },
-  { 
-    id: "smartChain", 
-    icon: Link2, 
-    href: "/smart-chain", 
-    label: "smartChain.title",
-    color: "from-indigo-500 to-purple-500"
   },
   { 
     id: "image-converter", 

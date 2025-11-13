@@ -22,12 +22,13 @@ import {
   FileText,
   ArrowUpRight,
   Activity,
-  Zap,
-  Link2,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { getStats, incrementVisitor } from "@/lib/stats";
 import { useSession } from "next-auth/react";
+import { getPinnedTools, togglePinnedTool, isPinned } from "@/lib/pinned-tools";
+import { Pin, PinOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const t = useTranslations();
@@ -35,6 +36,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [stats, setStats] = useState(getStats());
+  const [pinnedTools, setPinnedTools] = useState<string[]>(getPinnedTools());
 
   // Track visitor
   useEffect(() => {
@@ -47,26 +49,6 @@ export default function Home() {
   }, []);
 
   const tools = [
-    {
-      id: "auto-detect",
-      title: t("autoDetect.title"),
-      description: t("autoDetect.description"),
-      icon: Zap,
-      href: "/auto-detect",
-      color: "from-purple-500 to-pink-500",
-      category: "smart",
-      popular: true,
-    },
-    {
-      id: "smart-chain",
-      title: t("smartChain.title"),
-      description: t("smartChain.description"),
-      icon: Link2,
-      href: "/smart-chain",
-      color: "from-indigo-500 to-purple-500",
-      category: "smart",
-      popular: true,
-    },
     {
       id: "image-converter",
       title: t("tools.imageConverter.title"),
@@ -100,13 +82,28 @@ export default function Home() {
   ];
 
   const filteredTools = useMemo(() => {
-    if (!searchQuery) return tools;
-    return tools.filter(
-      (tool) =>
-        tool.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tool.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery, tools]);
+    let filtered = tools;
+    
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (tool) =>
+          tool.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          tool.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    // Sort: pinned first, then popular, then others
+    return filtered.sort((a, b) => {
+      const aPinned = pinnedTools.includes(a.id);
+      const bPinned = pinnedTools.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      if (a.popular && !b.popular) return -1;
+      if (!a.popular && b.popular) return 1;
+      return 0;
+    });
+  }, [searchQuery, tools, pinnedTools]);
 
   const toggleFavorite = (toolId: string) => {
     setFavorites((prev) =>
@@ -169,7 +166,7 @@ export default function Home() {
     {
       title: t("stats.conversions"),
       value: formatNumber(stats.totalConversions),
-      icon: Zap,
+      icon: Sparkles,
       color: "from-yellow-500 to-amber-500",
       bgColor: "from-yellow-500/10 to-amber-500/10",
       borderColor: "border-yellow-500/20",
@@ -313,11 +310,16 @@ export default function Home() {
         {/* Tools Grid */}
         <div className="mb-6 sm:mb-8 px-4 slide-in-from-bottom-4" style={{ animationDelay: "800ms" }}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20">
-                <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
               <h2 className="text-xl sm:text-2xl font-bold">{t("common.availableTools")}</h2>
+              {pinnedTools.length > 0 && (
+                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 text-xs">
+                  {pinnedTools.length} {t("common.pinned")}
+                </Badge>
+              )}
             </div>
             <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs sm:text-sm">
               {filteredTools.length} {t("common.toolsAvailable")}
@@ -384,30 +386,53 @@ export default function Home() {
                   </div>
                 </CardHeader>
                 <CardContent className="relative z-10">
-                  <Link
-                    href={tool.href}
-                    onClick={() => {
-                      // Save to history
-                      const history = JSON.parse(localStorage.getItem("toolHistory") || "[]");
-                      const newItem = {
-                        id: Date.now().toString(),
-                        toolId: tool.id,
-                        toolName: tool.title,
-                        timestamp: Date.now(),
-                        href: tool.href,
-                      };
-                      const updatedHistory = [newItem, ...history.filter((h: { toolId: string; }) => h.toolId !== tool.id)].slice(0, 10);
-                      localStorage.setItem("toolHistory", JSON.stringify(updatedHistory));
-                    }}
-                  >
-                    <Button className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105">
-                      <span className="relative z-10 flex items-center gap-2">
-                        {t("common.useTool")}
-                        <ArrowUpRight className="h-4 w-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
-                      </span>
-                      <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500" />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        togglePinnedTool(tool.id);
+                        setPinnedTools(getPinnedTools());
+                      }}
+                      className={cn(
+                        "h-9 w-9 hover:bg-primary/10",
+                        isPinned(tool.id) && "text-primary"
+                      )}
+                    >
+                      {isPinned(tool.id) ? (
+                        <Pin className="h-4 w-4 fill-current" />
+                      ) : (
+                        <PinOff className="h-4 w-4" />
+                      )}
                     </Button>
-                  </Link>
+                    <Link
+                      href={tool.href}
+                      className="flex-1"
+                      onClick={() => {
+                        // Save to history
+                        const history = JSON.parse(localStorage.getItem("toolHistory") || "[]");
+                        const newItem = {
+                          id: Date.now().toString(),
+                          toolId: tool.id,
+                          toolName: tool.title,
+                          timestamp: Date.now(),
+                          href: tool.href,
+                        };
+                        const updatedHistory = [newItem, ...history.filter((h: { toolId: string; }) => h.toolId !== tool.id)].slice(0, 10);
+                        localStorage.setItem("toolHistory", JSON.stringify(updatedHistory));
+                      }}
+                    >
+                      <Button className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105">
+                        <span className="relative z-10 flex items-center gap-2">
+                          {t("common.useTool")}
+                          <ArrowUpRight className="h-4 w-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
+                        </span>
+                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500" />
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
 
                 {/* Hover Effect */}

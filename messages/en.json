@@ -47,6 +47,7 @@
     "save": "Save",
     "saved": "Saved",
     "saveSettings": "Save Settings",
+    "pinned": "Pinned",
     "appearance": "Appearance",
     "chooseAppearance": "Choose your preferred appearance",
     "light": "Light",
@@ -119,6 +120,30 @@
     "useTool": "Use",
     "placeholder": "Type your message..."
   },
+  "livePreview": {
+    "title": "Live Preview",
+    "description": "See the result before downloading",
+    "before": "Before",
+    "after": "After",
+    "saved": "Saved",
+    "original": "Original",
+    "processed": "Processed",
+    "download": "Download",
+    "extractedText": "Extracted Text",
+    "textPreview": "Preview of text extracted from image"
+  },
+  "dragDrop": {
+    "dropFiles": "Drop Files Here",
+    "releaseToProcess": "Release files to start processing",
+    "selectTool": "Select Tool",
+    "filesSelected": "{count} files selected",
+    "moreFiles": "more files",
+    "useSuggestedTool": "Use Suggested Tool"
+  },
+  "quickActions": {
+    "recentTools": "Recent Tools",
+    "used": "used"
+  },
   "tools": {
     "imageConverter": {
       "title": "Image Converter",
@@ -181,4 +206,29 @@
   },
   "auth": {
     "signIn": "Sign In",
-    "signOut": "Sign O
+    "signOut": "Sign Out",
+    "signInTitle": "Sign In",
+    "signInDescription": "Sign in to access all features",
+    "email": "Email",
+    "password": "Password",
+    "signInButton": "Sign In",
+    "signInWithGoogle": "Sign in with Google",
+    "or": "Or",
+    "forTesting": "For Testing",
+    "emailPlaceholder": "example@email.com",
+    "passwordPlaceholder": "••••••••",
+    "loading": "Loading...",
+    "emailOrPasswordIncorrect": "Email or password is incorrect",
+    "signInError": "An error occurred while signing in",
+    "googleSignInError": "An error occurred while signing in with Google"
+  },
+  "stats": {
+    "statistics": "Statistics",
+    "totalVisitors": "Total Visitors",
+    "registeredUsers": "Registered Users",
+    "imagesUploaded": "Images Uploaded",
+    "filesCompressed": "Files Compressed",
+    "ocrProcessed": "OCR Processed",
+    "conversions": "Conversions"
+  }
+}

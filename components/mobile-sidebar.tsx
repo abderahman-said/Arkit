@@ -12,8 +12,7 @@ import {
   History,
   Star,
   X,
-  Zap,
-  Link2
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import NextImage from "next/image";
@@ -25,20 +24,6 @@ const tools = [
     href: "/", 
     label: "common.dashboard",
     color: "from-blue-500 to-cyan-500"
-  },
-  { 
-    id: "autoDetect", 
-    icon: Zap, 
-    href: "/auto-detect", 
-    label: "autoDetect.title",
-    color: "from-purple-500 to-pink-500"
-  },
-  { 
-    id: "smartChain", 
-    icon: Link2, 
-    href: "/smart-chain", 
-    label: "smartChain.title",
-    color: "from-indigo-500 to-purple-500"
   },
   { 
     id: "imageConverter", 

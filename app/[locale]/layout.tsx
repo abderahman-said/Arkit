@@ -9,6 +9,9 @@ import { SessionProvider } from "@/components/session-provider";
 import { HeaderWithMobileMenu } from "@/components/header-with-mobile-menu";
 import { Sidebar } from "@/components/sidebar";
 import { PageLoader } from "@/components/page-loader";
+import { AIAssistant } from "@/components/ai-assistant";
+import { GlobalDragDrop } from "@/components/global-drag-drop";
+import { QuickActions } from "@/components/quick-actions";
 import "./globals.css";
 
 const inter = Inter({ 
@@ -43,7 +46,7 @@ export default async function RootLayout({
 }) {
   const { locale } = await params;
 
-  if (!routing.locales.includes(locale as any)) {
+  if (!routing.locales.includes(locale as "en" | "ar")) {
     notFound();
   }
 
@@ -70,6 +73,9 @@ export default async function RootLayout({
                   {children}
                 </main>
               </div>
+              <AIAssistant />
+              <GlobalDragDrop />
+              <QuickActions />
             </NextIntlClientProvider>
           </SessionProvider>
         </ThemeProvider>
