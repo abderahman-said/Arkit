@@ -33,6 +33,13 @@ const tools = [
     color: "from-blue-500 to-cyan-500"
   },
   { 
+    id: "imageEditor", 
+    icon: ScanText, 
+    href: "/image-editor", 
+    label: "imageEditor.title",
+    color: "from-purple-500 to-pink-500"
+  },
+  { 
     id: "fileCompressor", 
     icon: FileDown, 
     href: "/file-compressor", 

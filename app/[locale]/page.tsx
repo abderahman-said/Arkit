@@ -60,6 +60,16 @@ export default function Home() {
       popular: true,
     },
     {
+      id: "image-editor",
+      title: t("imageEditor.title"),
+      description: t("imageEditor.description"),
+      icon: ScanText,
+      href: "/image-editor",
+      color: "from-purple-500 to-pink-500",
+      category: "images",
+      popular: true,
+    },
+    {
       id: "file-compressor",
       title: t("tools.fileCompressor.title"),
       description: t("tools.fileCompressor.description"),

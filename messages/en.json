@@ -144,6 +144,25 @@
     "recentTools": "Recent Tools",
     "used": "used"
   },
+  "imageEditor": {
+    "title": "Image Editor",
+    "description": "Crop images and remove backgrounds easily and professionally",
+    "selectTool": "Select Tool",
+    "chooseOperation": "Choose the desired operation",
+    "crop": "Crop Image",
+    "removeBg": "Remove Background",
+    "cropDescription": "Drag to select the area to crop",
+    "removeBgDescription": "Automatically remove background from image",
+    "dropImage": "Drop image here! 🎉",
+    "dragDropImage": "Drag image here or click to select",
+    "supportsAllFormats": "Supports all image formats (JPG, PNG, WEBP, etc.)",
+    "applyCrop": "Apply Crop",
+    "removeBackground": "Remove Background",
+    "processing": "Processing...",
+    "original": "Original",
+    "cropped": "Cropped",
+    "noBackground": "No Background"
+  },
   "tools": {
     "imageConverter": {
       "title": "Image Converter",
