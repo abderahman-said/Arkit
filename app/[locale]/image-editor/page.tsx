@@ -11,11 +11,7 @@ import {
   Image as ImageIcon, 
   Crop,
   Eraser,
-  Download,
   X,
-  RotateCw,
-  Maximize2,
-  Minimize2,
   Check,
   Loader2
 } from "lucide-react";
@@ -24,7 +20,6 @@ import { LivePreview } from "@/components/live-preview";
 import { incrementImagesUploaded } from "@/lib/stats";
 import { getToolSettings, saveToolSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
-import NextImage from "next/image";
 
 type EditorMode = "crop" | "removebg";
 
@@ -50,17 +45,19 @@ export default function ImageEditorPage() {
   const [cropArea, setCropArea] = useState<CropArea | null>(null);
   const [isCropping, setIsCropping] = useState(false);
   const [cropStart, setCropStart] = useState<{ x: number; y: number } | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  const [scale, setScale] = useState(1);
+  const cropOverlayRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   // Load saved settings
   useEffect(() => {
     const settings = getToolSettings("image-editor");
     if (settings.mode) {
-      setMode(settings.mode as EditorMode);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setMode(settings.mode as EditorMode);
+      }, 0);
     }
   }, []);
 
@@ -82,6 +79,21 @@ export default function ImageEditorPage() {
     }
   }, [selectedFile]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      if (processedUrl) {
+        URL.revokeObjectURL(processedUrl);
+      }
+    };
+  }, [previewUrl, processedUrl]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith("image/")) {
@@ -93,13 +105,7 @@ export default function ImageEditorPage() {
       setPreviewUrl(url);
       incrementImagesUploaded(1);
       
-      // Load image to get dimensions
-      const img = new Image();
-      img.onload = () => {
-        setImageSize({ width: img.width, height: img.height });
-        setScale(1);
-      };
-      img.src = url;
+      // Image will be loaded when displayed
     }
   };
 
@@ -116,12 +122,7 @@ export default function ImageEditorPage() {
       setPreviewUrl(url);
       incrementImagesUploaded(1);
       
-      const img = new Image();
-      img.onload = () => {
-        setImageSize({ width: img.width, height: img.height });
-        setScale(1);
-      };
-      img.src = url;
+      // Image will be loaded when displayed
     }
   };
 
@@ -135,11 +136,13 @@ export default function ImageEditorPage() {
     setIsDragging(false);
   };
 
-  // Crop functionality
-  const getImageRect = useCallback(() => {
+  // Get image display rect relative to container
+  const getImageDisplayRect = useCallback(() => {
     if (!imageRef.current || !containerRef.current) return null;
+    
     const img = imageRef.current;
     const container = containerRef.current;
+    
     const containerRect = container.getBoundingClientRect();
     const imgRect = img.getBoundingClientRect();
     
@@ -151,51 +154,129 @@ export default function ImageEditorPage() {
     };
   }, []);
 
-  const handleCropStart = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!previewUrl || mode !== "crop") return;
+  // Smooth crop handling with requestAnimationFrame
+  const handleCropStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!previewUrl || mode !== "crop" || !imageRef.current) return;
     e.preventDefault();
-    const rect = getImageRect();
-    if (!rect) return;
+    e.stopPropagation();
     
-    const x = e.clientX - (rect.left + containerRef.current!.getBoundingClientRect().left);
-    const y = e.clientY - (rect.top + containerRef.current!.getBoundingClientRect().top);
+    const displayRect = getImageDisplayRect();
+    if (!displayRect) return;
+    
+    const containerRect = containerRef.current!.getBoundingClientRect();
+    const x = e.clientX - containerRect.left - displayRect.left;
+    const y = e.clientY - containerRect.top - displayRect.top;
     
     // Clamp to image bounds
-    const clampedX = Math.max(0, Math.min(rect.width, x));
-    const clampedY = Math.max(0, Math.min(rect.height, y));
+    const clampedX = Math.max(0, Math.min(displayRect.width, x));
+    const clampedY = Math.max(0, Math.min(displayRect.height, y));
     
     setCropStart({ x: clampedX, y: clampedY });
     setIsCropping(true);
     setCropArea({ x: clampedX, y: clampedY, width: 0, height: 0 });
-  };
+    
+    // Animate crop overlay appearance with CSS transitions
+    setTimeout(() => {
+      if (cropOverlayRef.current) {
+        cropOverlayRef.current.style.opacity = "0";
+        cropOverlayRef.current.style.transform = "scale(0.8)";
+        cropOverlayRef.current.style.transition = "opacity 0.2s ease-out, transform 0.2s ease-out";
+        requestAnimationFrame(() => {
+          if (cropOverlayRef.current) {
+            cropOverlayRef.current.style.opacity = "1";
+            cropOverlayRef.current.style.transform = "scale(1)";
+          }
+        });
+      }
+    }, 0);
+  }, [previewUrl, mode, getImageDisplayRect]);
 
-  const handleCropMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isCropping || !cropStart || !previewUrl) return;
-    e.preventDefault();
-    const rect = getImageRect();
-    if (!rect) return;
+  const handleCropMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isCropping || !cropStart || !previewUrl || !imageRef.current) return;
     
-    const currentX = e.clientX - (rect.left + containerRef.current!.getBoundingClientRect().left);
-    const currentY = e.clientY - (rect.top + containerRef.current!.getBoundingClientRect().top);
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+    }
     
-    // Clamp to image bounds
-    const clampedX = Math.max(0, Math.min(rect.width, currentX));
-    const clampedY = Math.max(0, Math.min(rect.height, currentY));
-    
-    const x = Math.min(cropStart.x, clampedX);
-    const y = Math.min(cropStart.y, clampedY);
-    const width = Math.abs(clampedX - cropStart.x);
-    const height = Math.abs(clampedY - cropStart.y);
-    
-    setCropArea({ x, y, width, height });
-  };
+    rafRef.current = requestAnimationFrame(() => {
+      const displayRect = getImageDisplayRect();
+      if (!displayRect) return;
+      
+      const containerRect = containerRef.current!.getBoundingClientRect();
+      const currentX = e.clientX - containerRect.left - displayRect.left;
+      const currentY = e.clientY - containerRect.top - displayRect.top;
+      
+      // Clamp to image bounds
+      const clampedX = Math.max(0, Math.min(displayRect.width, currentX));
+      const clampedY = Math.max(0, Math.min(displayRect.height, currentY));
+      
+      const x = Math.min(cropStart.x, clampedX);
+      const y = Math.min(cropStart.y, clampedY);
+      const width = Math.abs(clampedX - cropStart.x);
+      const height = Math.abs(clampedY - cropStart.y);
+      
+      setCropArea({ x, y, width, height });
+    });
+  }, [isCropping, cropStart, previewUrl, getImageDisplayRect]);
 
-  const handleCropEnd = () => {
+  const handleCropEnd = useCallback(() => {
     setIsCropping(false);
-  };
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  // Global mouse handlers for smooth dragging
+  useEffect(() => {
+    if (!isCropping) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!cropStart || !imageRef.current || !containerRef.current) return;
+      
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      
+      rafRef.current = requestAnimationFrame(() => {
+        const displayRect = getImageDisplayRect();
+        if (!displayRect) return;
+        
+        const containerRect = containerRef.current!.getBoundingClientRect();
+        const currentX = e.clientX - containerRect.left - displayRect.left;
+        const currentY = e.clientY - containerRect.top - displayRect.top;
+        
+        // Clamp to image bounds
+        const clampedX = Math.max(0, Math.min(displayRect.width, currentX));
+        const clampedY = Math.max(0, Math.min(displayRect.height, currentY));
+        
+        const x = Math.min(cropStart.x, clampedX);
+        const y = Math.min(cropStart.y, clampedY);
+        const width = Math.abs(clampedX - cropStart.x);
+        const height = Math.abs(clampedY - cropStart.y);
+        
+        setCropArea({ x, y, width, height });
+      });
+    };
+
+    const handleMouseUp = () => {
+      handleCropEnd();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [isCropping, cropStart, getImageDisplayRect, handleCropEnd]);
 
   const applyCrop = async () => {
-    if (!previewUrl || !cropArea || !selectedFile) return;
+    if (!previewUrl || !cropArea || !selectedFile || cropArea.width <= 0 || cropArea.height <= 0) return;
 
     setIsProcessing(true);
     setProgress(0);
@@ -210,34 +291,47 @@ export default function ImageEditorPage() {
         img.src = previewUrl;
       });
 
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      const displayRect = getImageDisplayRect();
+      if (!displayRect) {
+        setIsProcessing(false);
+        return;
+      }
 
-      // Get actual image display dimensions
-      const displayRect = getImageRect();
-      if (!displayRect) return;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: false });
+      if (!ctx) {
+        setIsProcessing(false);
+        return;
+      }
+
+      // Calculate scale factors (natural size to display size)
+      const scaleX = img.naturalWidth / displayRect.width;
+      const scaleY = img.naturalHeight / displayRect.height;
       
-      // Calculate scale factors
-      const scaleX = img.width / displayRect.width;
-      const scaleY = img.height / displayRect.height;
-      
-      // Convert display coordinates to image coordinates
+      // Convert display coordinates to natural image coordinates
       const sx = cropArea.x * scaleX;
       const sy = cropArea.y * scaleY;
       const sw = cropArea.width * scaleX;
       const sh = cropArea.height * scaleY;
       
       // Ensure crop area is valid
-      if (sw <= 0 || sh <= 0) {
+      if (sw <= 0 || sh <= 0 || sx < 0 || sy < 0 || sx + sw > img.naturalWidth || sy + sh > img.naturalHeight) {
         setIsProcessing(false);
         return;
       }
 
-      canvas.width = sw;
-      canvas.height = sh;
+      canvas.width = Math.round(sw);
+      canvas.height = Math.round(sh);
       
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      // Use high-quality image rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      ctx.drawImage(
+        img,
+        sx, sy, sw, sh,  // Source rectangle (from original image)
+        0, 0, sw, sh     // Destination rectangle (to canvas)
+      );
 
       setProgress(50);
 
@@ -249,7 +343,7 @@ export default function ImageEditorPage() {
           setProgress(100);
         }
         setIsProcessing(false);
-      }, selectedFile.type, 0.95);
+      }, selectedFile.type || "image/png", 0.95);
     } catch (error) {
       console.error("Crop error:", error);
       setIsProcessing(false);
@@ -257,7 +351,7 @@ export default function ImageEditorPage() {
     }
   };
 
-  // Remove Background functionality (simplified client-side version)
+  // Improved Remove Background functionality
   const removeBackground = async () => {
     if (!previewUrl || !selectedFile) return;
 
@@ -265,17 +359,6 @@ export default function ImageEditorPage() {
     setProgress(0);
 
     try {
-      // Simulate processing
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
       const img = new Image();
       img.crossOrigin = "anonymous";
       
@@ -285,35 +368,71 @@ export default function ImageEditorPage() {
         img.src = previewUrl;
       });
 
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      setProgress(20);
 
-      canvas.width = img.width;
-      canvas.height = img.height;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        setIsProcessing(false);
+        return;
+      }
+
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
       ctx.drawImage(img, 0, 0);
+
+      setProgress(40);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Simple background removal algorithm (removes white/light backgrounds)
+      setProgress(60);
+
+      // Improved background removal algorithm
+      // Uses multiple techniques: brightness, color similarity, and edge detection
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-        const brightness = (r + g + b) / 3;
+        const a = data[i + 3];
         
-        // Remove pixels that are too bright (white background)
-        if (brightness > 240) {
-          data[i + 3] = 0; // Make transparent
+        // Skip already transparent pixels
+        if (a === 0) continue;
+        
+        // Calculate brightness
+        const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+        
+        // Calculate color variance (how similar RGB values are)
+        const variance = Math.abs(r - g) + Math.abs(g - b) + Math.abs(b - r);
+        
+        // Method 1: Remove very bright/white backgrounds
+        if (brightness > 245 && variance < 20) {
+          data[i + 3] = 0;
+          continue;
         }
-        // Remove pixels that are very light
-        else if (brightness > 220 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
-          data[i + 3] = Math.max(0, data[i + 3] - 100);
+        
+        // Method 2: Remove light gray backgrounds
+        if (brightness > 230 && brightness < 250 && variance < 30) {
+          data[i + 3] = Math.max(0, a - 150);
+          continue;
+        }
+        
+        // Method 3: Remove very light colored backgrounds (pastels)
+        if (brightness > 240 && r > 200 && g > 200 && b > 200) {
+          data[i + 3] = Math.max(0, a - 120);
+          continue;
+        }
+        
+        // Method 4: Remove near-white backgrounds with slight tint
+        if (brightness > 235 && Math.min(r, g, b) > 220) {
+          data[i + 3] = Math.max(0, a - 100);
         }
       }
 
+      setProgress(85);
+
       ctx.putImageData(imageData, 0, 0);
+      
       setProgress(95);
 
       canvas.toBlob((blob) => {
@@ -323,7 +442,6 @@ export default function ImageEditorPage() {
           setProcessedBlob(blob);
           setProgress(100);
         }
-        clearInterval(progressInterval);
         setIsProcessing(false);
       }, "image/png", 1.0);
     } catch (error) {
@@ -342,6 +460,8 @@ export default function ImageEditorPage() {
   };
 
   const resetImage = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (processedUrl) URL.revokeObjectURL(processedUrl);
     setSelectedFile(null);
     setPreviewUrl(null);
     setProcessedUrl(null);
@@ -472,14 +592,12 @@ export default function ImageEditorPage() {
                     )}
                     onMouseDown={mode === "crop" ? handleCropStart : undefined}
                     onMouseMove={mode === "crop" ? handleCropMove : undefined}
-                    onMouseUp={mode === "crop" ? handleCropEnd : undefined}
-                    onMouseLeave={mode === "crop" ? handleCropEnd : undefined}
                   >
                     <img
                       ref={imageRef}
                       src={previewUrl}
                       alt="Preview"
-                      className="max-w-full max-h-[500px] object-contain select-none"
+                      className="max-w-full max-h-[500px] object-contain select-none pointer-events-none"
                       draggable={false}
                     />
                     
@@ -490,26 +608,27 @@ export default function ImageEditorPage() {
                         <div
                           className="absolute inset-0 pointer-events-none"
                           style={{
-                            background: `linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) ${cropArea.x}px, transparent ${cropArea.x}px, transparent ${cropArea.x + cropArea.width}px, rgba(0,0,0,0.5) ${cropArea.x + cropArea.width}px, rgba(0,0,0,0.5) 100%),
-                                        linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) ${cropArea.y}px, transparent ${cropArea.y}px, transparent ${cropArea.y + cropArea.height}px, rgba(0,0,0,0.5) ${cropArea.y + cropArea.height}px, rgba(0,0,0,0.5) 100%)`,
+                            background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${cropArea.x}px, transparent ${cropArea.x}px, transparent ${cropArea.x + cropArea.width}px, rgba(0,0,0,0.6) ${cropArea.x + cropArea.width}px, rgba(0,0,0,0.6) 100%),
+                                        linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${cropArea.y}px, transparent ${cropArea.y}px, transparent ${cropArea.y + cropArea.height}px, rgba(0,0,0,0.6) ${cropArea.y + cropArea.height}px, rgba(0,0,0,0.6) 100%)`,
                           }}
                         />
                         {/* Crop border with grid */}
                         <div
+                          ref={cropOverlayRef}
                           className="absolute border-2 border-white shadow-2xl pointer-events-none"
                           style={{
                             left: `${cropArea.x}px`,
                             top: `${cropArea.y}px`,
                             width: `${cropArea.width}px`,
                             height: `${cropArea.height}px`,
-                            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5)",
+                            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.6)",
                           }}
                         >
                           {/* Grid lines (Rule of Thirds) */}
                           <div className="absolute inset-0 border border-white/30" style={{
                             backgroundImage: `
-                              linear-gradient(to right, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) 1px, transparent 1px),
-                              linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) 1px, transparent 1px)
+                              linear-gradient(to right, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.15) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.15) 1px, transparent 1px)
                             `,
                             backgroundSize: `${cropArea.width / 3}px ${cropArea.height / 3}px`,
                           }} />
@@ -523,11 +642,18 @@ export default function ImageEditorPage() {
                           ].map((pos, i) => (
                             <div
                               key={i}
-                              className="absolute w-5 h-5 bg-white border-2 border-purple-500 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg hover:scale-125 transition-transform"
+                              className="crop-handle absolute w-5 h-5 bg-white border-2 border-purple-500 rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg"
                               style={{
                                 left: `${pos.x}px`,
                                 top: `${pos.y}px`,
                                 cursor: pos.cursor,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = "scale(1.3)";
+                                e.currentTarget.style.transition = "transform 0.2s ease-out";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = "scale(1)";
                               }}
                             />
                           ))}
@@ -541,11 +667,18 @@ export default function ImageEditorPage() {
                           ].map((pos, i) => (
                             <div
                               key={`edge-${i}`}
-                              className="absolute w-4 h-4 bg-purple-500 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg hover:scale-125 transition-transform"
+                              className="crop-handle absolute w-4 h-4 bg-purple-500 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 shadow-lg"
                               style={{
                                 left: `${pos.x}px`,
                                 top: `${pos.y}px`,
                                 cursor: pos.cursor,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = "scale(1.4)";
+                                e.currentTarget.style.transition = "transform 0.2s ease-out";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = "scale(1)";
                               }}
                             />
                           ))}
@@ -588,6 +721,7 @@ export default function ImageEditorPage() {
                       onClick={removeBackground}
                       disabled={isProcessing}
                       className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl"
+                      size="lg"
                     >
                       {isProcessing ? (
                         <>
@@ -640,4 +774,3 @@ export default function ImageEditorPage() {
     </div>
   );
 }
-

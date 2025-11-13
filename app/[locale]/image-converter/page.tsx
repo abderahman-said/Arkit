@@ -28,7 +28,9 @@ export default function ImageConverterPage() {
   useEffect(() => {
     const settings = getToolSettings("image-converter");
     if (settings.outputFormat) {
-      setOutputFormat(settings.outputFormat as ImageFormat);
+      setTimeout(() => {
+        setOutputFormat(settings.outputFormat as ImageFormat);
+      }, 0);
     }
   }, []);
 
