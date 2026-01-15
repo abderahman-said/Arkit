@@ -24,7 +24,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
-import { getStats, incrementVisitor } from "@/lib/stats";
+import { getStats, getDefaultStats, incrementVisitor } from "@/lib/stats";
 import { useSession } from "next-auth/react";
 import { getPinnedTools, togglePinnedTool, isPinned } from "@/lib/pinned-tools";
 import { Pin, PinOff } from "lucide-react";
@@ -35,18 +35,27 @@ export default function Home() {
   const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [stats, setStats] = useState(getStats());
-  const [pinnedTools, setPinnedTools] = useState<string[]>(getPinnedTools());
+  const [stats, setStats] = useState(getDefaultStats());
+  const [pinnedTools, setPinnedTools] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setPinnedTools(getPinnedTools());
+    setStats(getStats());
+  }, []);
 
   // Track visitor
   useEffect(() => {
-    incrementVisitor();
-    const interval = setInterval(() => {
-      setStats(getStats());
-    }, 5000); // Update stats every 5 seconds
+    if (mounted) {
+      incrementVisitor();
+      const interval = setInterval(() => {
+        setStats(getStats());
+      }, 5000); // Update stats every 5 seconds
 
-    return () => clearInterval(interval);
-  }, []);
+      return () => clearInterval(interval);
+    }
+  }, [mounted]);
 
   const tools = [
     {
@@ -93,7 +102,7 @@ export default function Home() {
 
   const filteredTools = useMemo(() => {
     let filtered = tools;
-    
+
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(
@@ -102,7 +111,7 @@ export default function Home() {
           tool.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
+
     // Sort: pinned first, then popular, then others
     return filtered.sort((a, b) => {
       const aPinned = pinnedTools.includes(a.id);
@@ -184,8 +193,25 @@ export default function Home() {
     },
   ];
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": t("common.title"),
+    "description": t("common.description"),
+    "url": "https://toolshub.bg",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://toolshub.bg/search?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background dark:bg-background p-3 sm:p-4 md:p-6 relative overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Animated Background Elements */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 dark:bg-primary/3 rounded-full blur-3xl animate-pulse" />
@@ -210,17 +236,17 @@ export default function Home() {
 
         {/* Statistics Section */}
         <div className="mb-8 sm:mb-12 slide-in-from-bottom-4" style={{ animationDelay: "200ms" }}>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20">
-                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold">{t("stats.statistics")}</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20">
+                <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs sm:text-sm">
-                {t("common.updatedNow")}
-              </Badge>
+              <h2 className="text-xl sm:text-2xl font-bold">{t("stats.statistics")}</h2>
             </div>
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs sm:text-sm">
+              {t("common.updatedNow")}
+            </Badge>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {statsCards.map((stat, index) => {
               const Icon = stat.icon;
@@ -264,7 +290,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto mb-12 slide-in-from-bottom-4" style={{ animationDelay: "600ms" }}>
           <div className="relative">
             <Search className="absolute left-4 rtl:right-4 rtl:left-auto top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
+            <Input
               type="text"
               placeholder={t("common.search")}
               value={searchQuery}
@@ -351,11 +377,11 @@ export default function Home() {
                 <div
                   className={`absolute inset-0 bg-gradient-to-br ${tool.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
                 />
-                
+
                 {/* Favorite Button */}
                 <button
-                title="Add to favorites"
-                aria-label="Add to favorites"
+                  title="Add to favorites"
+                  aria-label="Add to favorites"
                   onClick={(e) => {
                     e.preventDefault();
                     toggleFavorite(tool.id);
@@ -363,11 +389,10 @@ export default function Home() {
                   className="absolute top-4 right-4 z-10 p-2 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-accent transition-all duration-200 hover:scale-110"
                 >
                   <Star
-                    className={`h-4 w-4 transition-all duration-200 ${
-                      isFavorite
-                        ? "fill-yellow-500 text-yellow-500 scale-110"
-                        : "text-muted-foreground group-hover:text-yellow-500"
-                    }`}
+                    className={`h-4 w-4 transition-all duration-200 ${isFavorite
+                      ? "fill-yellow-500 text-yellow-500 scale-110"
+                      : "text-muted-foreground group-hover:text-yellow-500"
+                      }`}
                   />
                 </button>
 
@@ -437,7 +462,7 @@ export default function Home() {
                       <Button className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105">
                         <span className="relative z-10 flex items-center gap-2">
                           {t("common.useTool")}
-                          <ArrowUpRight className="h-4 w-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
+                          <ArrowUpRight className="h-4  w-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform  rtl:scale-x-[-1] " />
                         </span>
                         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500" />
                       </Button>

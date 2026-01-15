@@ -161,7 +161,7 @@ export default function HistoryPage() {
                         >
                           <span className="relative z-10 flex items-center gap-2">
                             {t("common.useAgain")}
-                            <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                            <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform rtl:scale-x-[-1]" />
                           </span>
                           <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500" />
                         </Button>

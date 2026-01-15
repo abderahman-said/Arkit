@@ -56,7 +56,7 @@ export default function SettingsPage() {
             <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-violet-500 animate-pulse" />
             <span className="text-xs sm:text-sm font-medium text-violet-600 dark:text-violet-400">{t("common.manageSettings")}</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-violet-600 via-purple-600 to-violet-600 bg-clip-text text-transparent animate-pulse-glow flex items-center justify-center gap-2 sm:gap-3 px-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 text-violet-600 dark:text-violet-400 animate-pulse-glow flex items-center justify-center gap-2 sm:gap-3 px-4">
             <SettingsIcon className="h-8 w-8 sm:h-12 sm:w-12 text-violet-500" />
             {t("common.settings")}
           </h1>
