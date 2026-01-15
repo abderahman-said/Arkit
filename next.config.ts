@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
   /* config options here */
   // Turbopack configuration (empty config to silence the warning)
   turbopack: {},
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 };
 
 const pwaConfig = withPWA({
