@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, Cairo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -14,18 +13,6 @@ import { GlobalDragDrop } from "@/components/global-drag-drop";
 import { QuickActions } from "@/components/quick-actions";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  variable: "--font-cairo",
-  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
-  display: "swap",
-});
 
 export async function generateMetadata({
   params,
@@ -123,8 +110,17 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
-        className={`${inter.variable} ${cairo.variable} ${locale === "ar" ? "font-cairo" : "font-inter"} antialiased`}
+        className={`${locale === "ar" ? "font-cairo" : "font-inter"} antialiased`}
+        style={{ fontFamily: locale === "ar" ? "'Cairo', sans-serif" : "'Inter', sans-serif" }}
       >
         <ThemeProvider
           attribute="class"

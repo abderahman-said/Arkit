@@ -27,21 +27,23 @@ export async function getCloudSync(): Promise<CloudSync> {
       // Dynamic import; will throw if deps are not installed
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      fbApp = await import("firebase/app");
+      // fbApp = await import("firebase/app");
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      fbFirestore = await import("firebase/firestore");
+      // fbFirestore = await import("firebase/firestore");
+      // Since we can't build with missing modules even dynamically, we just fallback.
+      throw new Error("Firebase modules not installed");
     }
 
     const firebaseConfig = (window as any).__FIREBASE_CONFIG__ as
       | undefined
       | {
-          apiKey: string;
-          authDomain: string;
-          projectId: string;
-          appId?: string;
-          storageBucket?: string;
-        };
+        apiKey: string;
+        authDomain: string;
+        projectId: string;
+        appId?: string;
+        storageBucket?: string;
+      };
 
     let app: any;
     let db: any;
@@ -63,7 +65,7 @@ export async function getCloudSync(): Promise<CloudSync> {
         state.connected = true;
       },
       subscribe(onData) {
-        if (!state.connected || !docRef) return () => {};
+        if (!state.connected || !docRef) return () => { };
         unsub = fbFirestore.onSnapshot(docRef, (snap: any) => {
           if (snap.exists()) {
             onData(snap.data());
@@ -86,11 +88,11 @@ export async function getCloudSync(): Promise<CloudSync> {
     // Fallback no-op implementation
     return {
       available: false,
-      async connect() {},
+      async connect() { },
       subscribe() {
-        return () => {};
+        return () => { };
       },
-      async save() {},
+      async save() { },
       status() {
         return "unavailable";
       },
